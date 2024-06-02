@@ -16,7 +16,10 @@ write a response back
 
 package funHttpServer;
 
+
 import java.io.*;
+// Had to add the implementation of json to the build.gradle file
+import org.json.*;
 import java.net.*;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,6 +28,7 @@ import java.util.Random;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.nio.charset.Charset;
+
 
 class WebServer {
   public static void main(String args[]) {
@@ -61,7 +65,7 @@ class WebServer {
         try {
           server.close();
         } catch (IOException e) {
-          // TODO Auto-generated catch block
+          // Auto-generated catch block
           e.printStackTrace();
         }
       }
@@ -165,7 +169,6 @@ class WebServer {
 
         } else if (request.equalsIgnoreCase("random")) {
           // opens the random image page
-
           // open the index.html
           File file = new File("www/index.html");
 
@@ -197,26 +200,45 @@ class WebServer {
           // This multiplies two numbers, there is NO error handling, so when
           // wrong data is given this just crashes
 
-          Map<String, String> query_pairs = new LinkedHashMap<String, String>();
-          // extract path parameters
-          query_pairs = splitQuery(request.replace("multiply?", ""));
+          // Checking if there are parameters of num1 and num2
+          if(request.contains("num1=") && request.contains("num2=")) {
+            Map<String, String> query_pairs = new LinkedHashMap<String, String>();
+            // extract path parameters
+            query_pairs = splitQuery(request.replace("multiply?", ""));
 
-          // extract required fields from parameters
-          Integer num1 = Integer.parseInt(query_pairs.get("num1"));
-          Integer num2 = Integer.parseInt(query_pairs.get("num2"));
+            // Check if the parameters are integers
+            // Creating a method to check if the string is an int
+            if(isInt(query_pairs.get("num1")) && isInt(query_pairs.get("num2"))) {
+              // extract required fields from parameters
+              Integer num1 = Integer.parseInt(query_pairs.get("num1"));
+              Integer num2 = Integer.parseInt(query_pairs.get("num2"));
 
-          // do math
-          Integer result = num1 * num2;
+              // do math
+              Integer result = num1 * num2;
 
-          // Generate response
-          builder.append("HTTP/1.1 200 OK\n");
-          builder.append("Content-Type: text/html; charset=utf-8\n");
-          builder.append("\n");
-          builder.append("Result is: " + result);
-
-          // TODO: Include error handling here with a correct error code and
-          // a response that makes sense
-
+              // Generate response
+              builder.append("HTTP/1.1 200 OK\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("Result is: " + result);
+            }
+            // Include error handling here with a correct error code and
+            // a response that makes sense
+            else {
+              builder.append("HTTP/1.1 400 Bad Request\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("Error: Input is not a valid integer");
+             }
+          
+          }
+          // Making a error handling for the correct response of code to check if there are parameters
+          else {
+            builder.append("HTTP/1.1 404 Not Found\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Error: Missing parameters num1 and num2");
+          }       
         } else if (request.contains("github?")) {
           // pulls the query from the request and runs it with GitHub's REST API
           // check out https://docs.github.com/rest/reference/
@@ -226,21 +248,164 @@ class WebServer {
           // "Owner's repo is named RepoName. Example: find RepoName's contributors" translates to
           //     "/repos/OWNERNAME/REPONAME/contributors"
 
+          // Using this example:
+          // "host : PORT /github?query = users/amehlhase316/repos"
+          // Parse the JSON returned by your fetch and create an appropriate
+          // response based on what the assignment document asks for
           Map<String, String> query_pairs = new LinkedHashMap<String, String>();
           query_pairs = splitQuery(request.replace("github?", ""));
-          String json = fetchURL("https://api.github.com/" + query_pairs.get("query"));
-          System.out.println(json);
+          // Providing a try-catch block
+          try {
+            // Fetching the GitHub API url
+            String json = fetchURL("https://api.github.com/" + query_pairs.get("query"));
+            // In the example above I need to make a JSON array for the url string
+            //Parse the JSON for the github url
+            JSONArray r = new JSONArray(json);
+            
+            builder.append("HTTP/1.1 200 OK\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Check the todos mentioned in the Java source file");
+            
+            builder.append("Length of the url: "+ r.length());
+            // Using a for loop to loop through the entries in the JSON array
+            for(int i = 0; i < r.length(); i++) {
+              // Implementing a JSONObject
+              // need to use obj int=stead of r from above
+              JSONObject obj = r.getJSONObject(i);
 
-          builder.append("HTTP/1.1 200 OK\n");
-          builder.append("Content-Type: text/html; charset=utf-8\n");
-          builder.append("\n");
-          builder.append("Check the todos mentioned in the Java source file");
-          // TODO: Parse the JSON returned by your fetch and create an appropriate
-          // response based on what the assignment document asks for
+              // Getting the repo name
+              String name = obj.getString("name");
+              builder.append("Repo name: "+ name);
+              builder.append("\n");
+              // Getting the owner of the repo name
+              JSONObject owner = obj.getJSONObject("owner");
+              String ownerName = owner.getString("login");
+              builder.append("Owner name: "+ ownerName);
+              builder.append("\n");
+              // Getting the id of the repo
+              JSONObject id = obj.getJSONObject("id");
+              String idString = id.getString("login");
+              builder.append("ID: "+ idString);
+              builder.append("\n\n");
 
-        } else {
+            }
+            // end of the try branch
+          } catch(Exception e) {
+            builder.append("HTTP/1.1 505 HTTP Version Not Supported");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Error: The URL is formatted wrong");
+          }
+     
+        } // These are where I put other two requests for Task 2.6.3 
+        // First request
+        else if(request.contains("sort?")) {
+          Map<String, String> query_pairs = new LinkedHashMap<String, String>();
+          query_pairs = splitQuery(request.replace("sort?", ""));
+
+          // Checking if the url has two parameters = list and order
+          if (!query_pairs.containsKey("order=") || !query_pairs.containsKey("list=")) {
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Array and order are required");
+          } else {
+            String order = query_pairs.get("order=");
+            //Getting the list
+            String list = query_pairs.get("list=");
+            String[] lst = list.split(",");
+            int[] arr = new int[lst.length];
+            // for-loop of the array
+            for(int i = 0; i < lst.length; i++) {
+              arr[i] = Integer.parseInt(lst[i]);
+            }
+            //sorting the list with the order 
+            // Choosing a ascend or descend
+            if(order.equals("ascend")) {
+              // the ascending order
+              Arrays.sort(arr);
+            } else if(order.equals("descend")) {
+              // doing the descending order
+              Arrays.sort(arr);
+              int x = 0;
+              int y = arr.length - 1;
+              while(x < y) {
+                int temp = arr[x];
+                arr[x] = arr[y];
+                arr[y] = temp;
+                x++;
+                y--;
+              }
+            } else {
+              builder.append("HTTP/1.1 400 Bad Request\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("Error. Please use 'ascend' or 'descend' for the order.");
+              
+            }
+
+            StringBuilder res = new StringBuilder();
+            for(int i = 0; i < arr.length; i++) {
+              res.append(arr[i]);
+              if(i != arr.length - 1) {
+                res.append(",");
+              }
+            }
+
+            builder.append("HTTP/1.1 200 OK\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            //builder.append(res.toString());
+            builder.append(res);
+          }
+        }// Second Request
+        else if(request.contains("area_of_triangle?")) {
+          // This multiplies two numbers, there is NO error handling, so when
+          // wrong data is given this just crashes
+          
+          // Checking if there are parameters of num1 and num2
+          if(request.contains("base=") && request.contains("height=")) {
+            Map<String, String> query_pairs = new LinkedHashMap<String, String>();
+            // extract path parameters
+            query_pairs = splitQuery(request.replace("area_of_triangle?", ""));
+
+            // Check if the parameters are integers
+            // Creating a method to check if the string is an double
+            if(isDouble(query_pairs.get("base")) && isDouble(query_pairs.get("height"))) {
+              // extract required fields from parameters
+              Double base = Double.parseDouble(query_pairs.get("base"));
+              Double height = Double.parseDouble(query_pairs.get("height"));
+
+              // do math
+              Double result = (0.5) * base * height;
+
+              // Generate response
+              builder.append("HTTP/1.1 200 OK\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("Result is: " + result);
+            }
+            // Include error handling here with a correct error code and
+            // a response that makes sense
+            else {
+              builder.append("HTTP/1.1 400 Bad Request\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("Error: Input is not a Double type.");
+             }
+          
+          }
+          // Making a error handling for the correct response of code to check if there are parameters
+          else {
+            builder.append("HTTP/1.1 404 Not Found\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Error: Missing parameters of base and height.");
+          }       
+        }
+        else {
           // if the request is not recognized at all
-
           builder.append("HTTP/1.1 400 Bad Request\n");
           builder.append("Content-Type: text/html; charset=utf-8\n");
           builder.append("\n");
@@ -361,5 +526,27 @@ class WebServer {
       System.out.println("Exception in url request:" + ex.getMessage());
     }
     return sb.toString();
+  }
+
+  //Checking if the String is and Integer on the num1 and num2
+  public boolean isInt(String str) {
+    try {
+      Integer.parseInt(str);
+      return true;
+    }
+    catch(Exception e) {
+      return false;
+    }
+  }
+
+  //Checking if the string is a Double num on both base and height
+  public boolean isDouble(String str) {
+    try {
+      Double.parseDouble(str);
+      return true;
+    }
+    catch(Exception e) {
+      return false;
+    }
   }
 }
